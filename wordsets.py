@@ -55,7 +55,8 @@ def words_matching_pattern_and_other_chars(
     """
     Find 5 letter words
         that match the supplied pattern and also
-        include the other supplied chars
+        include the other supplied chars but
+        not the excluded chars
     """
 
     def find_unmatched_letters(word: Word) -> Set[Letter]:
