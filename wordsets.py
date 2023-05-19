@@ -50,7 +50,7 @@ def find_pattern_matches(pattern: Word) -> Set[Word]:
 
 
 def words_matching_pattern_and_other_chars(
-    pattern: Word, including: str = ""
+    pattern: Word, including: str = "", excluding: str = ""
 ) -> List[Word]:
     """
     Find 5 letter words
@@ -58,19 +58,24 @@ def words_matching_pattern_and_other_chars(
         include the other supplied chars
     """
 
-    matches: Set[Word] = find_pattern_matches(pattern)
-
-    # reduce to those that also contain other chars in including
-    final_list = []
-    good_chars = set(including)
-    for word in matches:
+    def find_unmatched_letters(word: Word) -> Set[Letter]:
         unmatched = set()
         for char1, char2 in zip(word, pattern):
             if char2 not in ascii_lowercase:
                 unmatched.add(char1)
-        if good_chars <= unmatched:
+        return unmatched
+
+    matches: Set[Word] = find_pattern_matches(pattern)
+
+    # reduce to those that also contain other chars in including
+    # but do not contain other chars in excluding
+    final_list = []
+    good_chars = set(including)
+    bad_chars = set(excluding)
+    for word in matches:
+        unmatched = find_unmatched_letters(word)
+        if good_chars <= unmatched and not bad_chars & unmatched:
             final_list.append(word)
-    # sort and return
     return sorted(final_list)
 
 
