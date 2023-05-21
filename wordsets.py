@@ -13,6 +13,7 @@ from string import ascii_lowercase
 WORDFILE: Path = Path("sgb-words.txt")
 
 Letter = str
+Char = str
 Word = str
 setmatrix: Tuple[Dict[Letter, Set[Word]]] = (
     defaultdict(set),
@@ -22,63 +23,112 @@ setmatrix: Tuple[Dict[Letter, Set[Word]]] = (
     defaultdict(set),
 )
 
-with open(WORDFILE, encoding="UTF-8") as infile:
-    for word in infile:
-        word = word.rstrip()
-        for position, character in enumerate(word):
-            setmatrix[position][character].add(word)
 
-
-def find_pattern_matches(pattern: Word) -> Set[Word]:
-    """
-    Find 5 letter words that match the supplied pattern
+class Game:
+    """Represents a game of Wordle which will consist of
+    a sequence of calls to guess.
     """
 
-    hit_sets: List[Set[Word]] = []  # sets of words with char at each posn
-    pattern += "....."  # in case len(pattern) < 5
-    # build hit_sets
-    for position, character in enumerate(pattern[:5]):
-        if character in ascii_lowercase:
-            hit_sets.append(setmatrix[position][character])
-    # reduce to intersection of all hit_sets
-    if len(hit_sets) == 0:
-        matches = set()
-    else:
-        first, *others = hit_sets
-        matches = first.intersection(*others)
-    return matches
+    def __init__(self) -> None:
+        self.guesses: List[Word] = []  # record of guesses to date
+        self.possibles: Set[Word] = set()  # what words remain
+        self.answer: Set[Char] = [" "] * 5
+        with open(WORDFILE, encoding="UTF-8") as infile:
+            for word in infile:
+                word = word.rstrip()
+                self.possibles.add(word)
+        self.setmatrix = None
+        self._reindex()
+
+    def _clear_index(self) -> None:
+        self.setmatrix: Tuple[Dict[Letter, Set[Word]]] = (
+            defaultdict(set),
+            defaultdict(set),
+            defaultdict(set),
+            defaultdict(set),
+            defaultdict(set),
+        )  # remaining words index
+
+    def _reindex(self) -> None:
+        self._clear_index()
+        for word in self.possibles:
+            for position, character in enumerate(word):
+                self.setmatrix[position][character].add(word)
+
+    def _remove_words(self, char: Char, char_posn: int = 0) -> None:
+        if not char_posn:  # remove all words containing char
+            remove_set = {word for word in self.possibles if char in word}
+        else:  # remove words with char at char_posn
+            remove_set = self.setmatrix[char_posn][char]
+        self.possibles -= remove_set
+        self._reindex()
+
+    def guess(self, word: Word, matches: Word) -> None:
+        """game.guess(<a 5-letter guess>, <a 5-char response from game>)
+        In the response; 0 represents an incorrect letter,
+                         1 represents a correct letter in the wrong place
+                         2 represents a correct letter in the correct place
+        """
+
+        def process_misses():
+            for char, result in zip(word, matches):
+                if result == "0":  # character is not in solution anywhere
+                    if char not in self.answer:  # double letter
+                        self._remove_words(char, 0)
+
+        def process_near_misses():
+            for position, (char, result) in enumerate(zip(word, matches)):
+                if result == "1":  # character not in this position
+                    self._remove_words(char, position)
+
+        def process_hits():
+            for position, (char, result) in enumerate(zip(word, matches)):
+                if result == "2":  # character in this position
+                    # add to answer
+                    if char in ascii_lowercase:
+                        self.answer[position] = char
+
+        self.guesses.append(word)
+        process_misses()
+        process_near_misses()
+        process_hits()
+
+        hit_sets: List[Set[Word]] = []  # sets of words with char at posn
+        for position, char in enumerate(self.answer):
+            if char != " ":
+                hit_sets.append(self.setmatrix[position][char])
+        self.possibles = self.possibles.intersection(*hit_sets)
+        self.possibles -= set(self.guesses)
+        print("\nGuesses so far\n")
+        for attempt in self.guesses:
+            print("\t" + attempt)
+        print()
+        if not self.possibles:
+            print("That should be it!")
+        else:
+            size = len(self.possibles)
+            if size < 16:
+                print("Choices left:\n")
+                print("\t", end="")
+                for choice in self.possibles:
+                    print(choice, end="   ")
+                print()
+            else:
+                print(f"{size} possibilities left")
+            print()
 
 
-def words_matching_pattern_and_other_chars(
-    pattern: Word, including: str = "", excluding: str = ""
-) -> List[Word]:
-    """
-    Find 5 letter words
-        that match the supplied pattern and also
-        include the other supplied chars but
-        not the excluded chars
-    """
-
-    def find_unmatched_letters(word: Word) -> Set[Letter]:
-        unmatched = set()
-        for char1, char2 in zip(word, pattern):
-            if char2 not in ascii_lowercase:
-                unmatched.add(char1)
-        return unmatched
-
-    matches: Set[Word] = find_pattern_matches(pattern)
-
-    # reduce to those that also contain other chars in including
-    # but do not contain other chars in excluding
-    final_list = []
-    good_chars = set(including)
-    bad_chars = set(excluding)
-    for word in matches:
-        unmatched = find_unmatched_letters(word)
-        if good_chars <= unmatched and not bad_chars & unmatched:
-            final_list.append(word)
-    return sorted(final_list)
-
-
-# short form
-match = words_matching_pattern_and_other_chars
+if __name__ == "__main__":
+    go = Game()
+    result = ""
+    print(
+        """
+In the response; 0 represents an incorrect letter,
+    1 represents a correct letter in the wrong place
+    2 represents a correct letter in the correct place
+"""
+    )
+    while result != "22222":
+        guess = input("Guess: ")
+        result = input("Result: ")
+        go.guess(guess, result)
