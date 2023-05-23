@@ -88,17 +88,22 @@ class Game:
                     if char in ascii_lowercase:
                         self.answer[position] = char
 
+        def calculate_possible_answers():
+            hit_sets: List[Set[Word]] = []  # sets of words with char at posn
+            for position, char in enumerate(self.answer):
+                if char != " ":
+                    hit_sets.append(self.setmatrix[position][char])
+            self.possibles = self.possibles.intersection(*hit_sets)
+            self.possibles -= set(self.guesses)
+
+        word = word.lower()
         self.guesses.append(word)
+
         process_misses()
         process_near_misses()
         process_hits()
+        calculate_possible_answers()
 
-        hit_sets: List[Set[Word]] = []  # sets of words with char at posn
-        for position, char in enumerate(self.answer):
-            if char != " ":
-                hit_sets.append(self.setmatrix[position][char])
-        self.possibles = self.possibles.intersection(*hit_sets)
-        self.possibles -= set(self.guesses)
         print("\nGuesses so far\n")
         for attempt in self.guesses:
             print("\t" + attempt)
